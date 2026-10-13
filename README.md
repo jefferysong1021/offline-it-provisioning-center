@@ -54,6 +54,16 @@ it-provisioning-center/
 
 请只放入来源可信、已验证的安装包。驱动和脚本执行前应先在测试电脑验证。
 
+## 界面截图
+
+### 邮箱配置 / Mail Profile
+
+![邮箱配置界面](docs/screenshots/mail-profile.png)
+
+### 软件与驱动 / Packages
+
+![软件与驱动安装界面](docs/screenshots/packages.png)
+
 ## 打包为 U 盘便携版
 
 在 Windows 上使用与目标电脑架构一致的 Python，安装 PyInstaller：
