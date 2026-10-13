@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+build/
+dist/
+logs/
+package_manifest.json
+.venv/
+venv/
+.idea/
+.vscode/
+*.user
+*.suo
+
+# Local offline installers and driver packages are kept beside the app/USB copy,
+# but are intentionally not published to the source repository.
+packages/*.exe
+packages/*.msi
+packages/*.msix
+packages/*.msixbundle
+packages/*.appx
+packages/*.cab
+drivers/*.exe
+drivers/*.msi
+drivers/*.msix
+drivers/*.msixbundle
+drivers/*.appx
+drivers/*.cab

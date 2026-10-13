@@ -1,0 +1,24 @@
+[
+  {
+    "id": "example-app",
+    "name": "Example Office App",
+    "category": "package",
+    "type": "exe",
+    "file": "packages\\ExampleSetup.exe",
+    "silent_args": ["/quiet", "/norestart"],
+    "requires_admin": true,
+    "timeout_seconds": 1800,
+    "sha256": ""
+  },
+  {
+    "id": "example-driver",
+    "name": "Example Driver",
+    "category": "driver",
+    "type": "inf",
+    "file": "drivers\\example\\driver.inf",
+    "silent_args": [],
+    "requires_admin": true,
+    "timeout_seconds": 600,
+    "sha256": ""
+  }
+]
