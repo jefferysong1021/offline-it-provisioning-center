@@ -8,10 +8,14 @@ import platform
 import re
 import subprocess
 import sys
+import threading
 import tkinter as tk
 from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
+
+from monitor_panel import MonitorPanel
+from reinstall import install_matching_drivers, launch_setup, prepare_clean_install, validate_plan
 
 
 APP_NAME = "IT Provisioning Center"
@@ -271,10 +275,117 @@ class App(tk.Tk):
         notebook.pack(fill="both", expand=True, padx=18, pady=(0, 18))
         email_frame = ttk.Frame(notebook)
         packages_frame = ttk.Frame(notebook)
+        reinstall_frame = ttk.Frame(notebook)
+        monitor_frame = ttk.Frame(notebook)
         notebook.add(email_frame, text="邮箱配置 / Mail Profile")
         notebook.add(packages_frame, text="软件与驱动 / Packages")
+        notebook.add(reinstall_frame, text="系统重装 / Windows Setup")
+        notebook.add(monitor_frame, text="实时诊断 / Diagnostics")
         self._build_email_panel(email_frame)
         self._build_package_panel(packages_frame)
+        self._build_reinstall_panel(reinstall_frame)
+        MonitorPanel(monitor_frame).pack(fill="both", expand=True)
+
+    def _build_reinstall_panel(self, parent) -> None:
+        self.iso_path = tk.StringVar()
+        self.reinstall_driver_path = tk.StringVar()
+        self.reinstall_mode = tk.StringVar(value="upgrade")
+        parent.columnconfigure(0, weight=1)
+        form = ttk.Frame(parent, style="Card.TFrame")
+        form.grid(row=0, column=0, sticky="ew", padx=12, pady=12)
+        form.columnconfigure(1, weight=1)
+        ttk.Label(form, text="外部 Windows ISO", style="Card.TLabel").grid(row=0, column=0, sticky="w", padx=12, pady=12)
+        ttk.Entry(form, textvariable=self.iso_path).grid(row=0, column=1, sticky="ew")
+        ttk.Button(form, text="选择 ISO", command=self._choose_iso).grid(row=0, column=2, padx=12)
+        ttk.Label(form, text="INF 驱动目录", style="Card.TLabel").grid(row=1, column=0, sticky="w", padx=12, pady=12)
+        ttk.Entry(form, textvariable=self.reinstall_driver_path).grid(row=1, column=1, sticky="ew")
+        ttk.Button(form, text="选择目录", command=self._choose_driver_dir).grid(row=1, column=2, padx=12)
+        ttk.Radiobutton(form, text="原位重装：尽量保留应用与文件", variable=self.reinstall_mode, value="upgrade").grid(row=2, column=0, columnspan=3, sticky="w", padx=12, pady=4)
+        ttk.Radiobutton(form, text="全新安装：生成操作计划，另行制作启动盘并在 Setup 中选分区", variable=self.reinstall_mode, value="clean").grid(row=3, column=0, columnspan=3, sticky="w", padx=12, pady=4)
+        ttk.Button(form, text="检查镜像与驱动", command=self._check_reinstall).grid(row=4, column=0, padx=12, pady=14, sticky="w")
+        ttk.Button(form, text="执行所选流程", command=self._execute_reinstall).grid(row=4, column=1, pady=14, sticky="w")
+        ttk.Button(form, text="重装后安装匹配驱动", command=self._install_reinstall_drivers).grid(row=5, column=0, columnspan=3, padx=12, pady=(0, 12), sticky="w")
+        self.reinstall_preview = tk.Text(parent, height=17, background="#111827", foreground="#d1d5db", relief="flat", wrap="word")
+        self.reinstall_preview.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
+        parent.rowconfigure(1, weight=1)
+        self.reinstall_preview.insert("end", "请选择外部文件夹中的 Windows ISO。原位重装启动 ISO 内的 Windows Setup；全新安装会生成操作计划并要求从安装 U 盘启动。\n\n驱动目录可放在程序目录之外，但全新安装前应复制到不会被清空的介质。")
+
+    def _choose_iso(self) -> None:
+        chosen = filedialog.askopenfilename(title="选择 Windows ISO", filetypes=[("ISO 镜像", "*.iso")])
+        if chosen:
+            self.iso_path.set(chosen)
+            self._check_reinstall()
+
+    def _choose_driver_dir(self) -> None:
+        chosen = filedialog.askdirectory(title="选择 INF 驱动目录")
+        if chosen:
+            self.reinstall_driver_path.set(chosen)
+            self._check_reinstall()
+
+    def _check_reinstall(self):
+        try:
+            plan = validate_plan(self.iso_path.get(), self.reinstall_mode.get(), self.reinstall_driver_path.get(), ROOT)
+            lines = ["镜像与驱动预检 / Preflight", "=" * 45,
+                     f"设备：{plan.computer}  架构：{plan.architecture}", f"镜像：{plan.iso}",
+                     f"大小：{plan.size_gb} GB", f"模式：{'原位重装' if plan.mode == 'upgrade' else '全新安装'}",
+                     f"驱动目录：{plan.driver_dir or '未指定'}", f"INF 数量：{plan.driver_count}", "",
+                     "请在继续前备份并验证重要数据。重装可能改变应用、设置或分区。",
+                     "原位重装由 Windows Setup 决定是否能保留应用和文件；语言、版本及架构不兼容时可能不可用。",
+                     "全新安装只生成计划并挂载验证镜像；需另行制作启动盘，进入 Windows Setup 选择分区。"]
+            self.reinstall_preview.delete("1.0", "end")
+            self.reinstall_preview.insert("end", "\n".join(lines))
+            return plan
+        except Exception as exc:
+            messagebox.showerror("预检失败", str(exc))
+            return None
+
+    def _execute_reinstall(self) -> None:
+        plan = self._check_reinstall()
+        if not plan:
+            return
+        if plan.mode == "upgrade" and not is_admin():
+            messagebox.showwarning("需要管理员权限", "请以管理员身份启动本程序，再运行 Windows Setup。")
+            return
+        if not messagebox.askyesno("确认备份", "你是否已备份并验证重要文件、浏览器数据及应用配置？\nWindows Setup 可能要求重启，并可能改变应用或文件。"):
+            return
+        if plan.mode == "upgrade":
+            if not messagebox.askyesno("启动 Windows Setup", "将挂载所选 ISO 并启动 Windows Setup 原位安装。\n请在 Setup 页面再次核对保留选项。继续？"):
+                return
+        try:
+            if plan.mode == "upgrade":
+                _command, path = launch_setup(plan, LOG_DIR)
+                messagebox.showinfo("已启动", f"Windows Setup 已打开。请在安装界面确认保留选项。\n记录：{path}")
+            else:
+                path = prepare_clean_install(plan, LOG_DIR)
+                messagebox.showinfo("全新安装准备完成", f"已检查镜像路径和大小，操作计划：\n{path}\n\n请另行核对镜像 SHA-256 并制作安装 U 盘；程序没有清空任何磁盘。")
+            self.status.set(f"重装流程：{path.name}")
+        except Exception as exc:
+            messagebox.showerror("无法继续", str(exc))
+
+    def _install_reinstall_drivers(self) -> None:
+        if not is_admin():
+            messagebox.showwarning("需要管理员权限", "请以管理员身份启动本程序后安装驱动。")
+            return
+        directory = self.reinstall_driver_path.get().strip()
+        if not directory:
+            messagebox.showwarning("缺少目录", "请先选择 INF 驱动目录。")
+            return
+        if not messagebox.askyesno("安装驱动", f"将扫描以下目录中的 INF，交给 Windows PnPUtil 安装与当前硬件匹配的驱动：\n{directory}\n\n请确认驱动来源可信。继续？"):
+            return
+        self.status.set("正在安装匹配驱动，请等待…")
+
+        def worker() -> None:
+            try:
+                code, path = install_matching_drivers(directory, LOG_DIR)
+                self.after(0, lambda: self._driver_result(code, path))
+            except Exception as exc:
+                self.after(0, lambda msg=str(exc): messagebox.showerror("驱动安装失败", msg))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _driver_result(self, code: int, path: Path) -> None:
+        self.status.set(f"驱动安装退出码 {code} · {path.name}")
+        messagebox.showinfo("驱动安装结束", f"PnPUtil 退出码：{code}\n详情：{path}")
 
     def _email_field(self, parent, key: str, label: str, show: str | None = None) -> None:
         row = ttk.Frame(parent, style="Card.TFrame")

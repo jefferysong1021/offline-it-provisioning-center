@@ -4,11 +4,31 @@ IT Provisioning Center
 
 面向企业 IT 装机和账号配置场景的本地桌面原型。
 
+## 新增：系统重装
+
+“系统重装 / Windows Setup”页可选择**程序目录之外**的 Windows ISO，另选 INF 驱动目录。预检会核对 ISO 是否存在、文件大小、驱动 INF 数量和当前设备架构。
+
+- **原位重装**：备份确认后挂载 ISO，交互式启动其中的 Windows Setup。Setup 会检查版本、语言和架构兼容性；只有安装界面明确显示可保留应用与文件时才继续。程序本身不保证保留数据。
+- **全新安装**：检查 ISO 路径、扩展名和大小，生成 `logs/clean-install-plan-*.json`。仍需核对发布者提供的镜像 SHA-256，并另行把 ISO 制作成可启动 U 盘；从 U 盘启动后由操作员在 Windows Setup 中选择目标磁盘和分区。当前程序不会格式化磁盘，也不会自动制作启动盘。
+- **重装后驱动**：再次打开程序，选择含 INF 的驱动目录，点击“重装后安装匹配驱动”。程序调用 `pnputil /add-driver *.inf /subdirs /install`，由 Windows 匹配当前硬件，结果写入 `logs/driver-install-*.json`。要求管理员权限。其他类型的驱动安装包可在“软件与驱动”页处理。
+
+原位重装也需要管理员权限。ISO 和驱动来源须可信；全新安装前应把驱动放在不会被清空的位置，并验证重要数据备份。请使用 Windows 官方安装介质工具制作启动盘。
+
+## 新增：实时诊断
+
+“实时诊断 / Diagnostics”页每 2–10 秒采样 CPU、物理内存、系统盘空间，显示最近 60 个样本的趋势图，并采集高占用进程的 CPU、内存和磁盘读写速率。可手动或随采样探测回环地址、默认网关、DNS 解析、指定 TCP 主机端口、目标域名的 TCP 443 和实际 HTTPS 请求。每个 TCP 目标尝试 3 次，计算平均建连耗时、波动和失败率；这不是 ICMP 丢包率。界面绘制 CPU、内存、系统盘及 TCP 目标延迟趋势。最近 60 次网络采样也会写入导出的 JSON。
+
+初步规则参考 CPU ≥85%、内存 ≥85%、系统盘 ≥90%，同时给出网关、DNS、TCP 层的检查建议。采集是只读的，支持导出含历史样本和判断依据的 JSON。网关禁止 ICMP、代理、VPN 或系统权限可能影响部分检测结果，应结合具体业务访问测试判断。
+
 ## 启动
+
+请在装有完整 Tcl/Tk 组件的 Windows Python 环境运行；打包前先确认本机 `python app.py` 能打开窗口。
 
 ```powershell
 python app.py
 ```
+
+或双击 `start.bat`。
 
 验证环境：
 
@@ -66,7 +86,7 @@ it-provisioning-center/
 
 ## 打包为 U 盘便携版
 
-在 Windows 上使用与目标电脑架构一致的 Python，安装 PyInstaller：
+在 Windows 上使用与目标电脑架构一致、包含完整 Tcl/Tk 的 Python，安装 PyInstaller：
 
 ```powershell
 py -m pip install pyinstaller

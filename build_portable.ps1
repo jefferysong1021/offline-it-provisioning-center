@@ -3,16 +3,27 @@ $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $projectRoot
 
+$pythonCommand = if (Get-Command py -ErrorAction SilentlyContinue) {
+    "py"
+} elseif (Get-Command python -ErrorAction SilentlyContinue) {
+    "python"
+} else {
+    throw "Python not found. Install Python with Tk support before building."
+}
+
 Write-Host "Checking PyInstaller..."
-py -m PyInstaller --version
+& $pythonCommand -m PyInstaller --version
 
 Write-Host "Building portable application..."
-py -m PyInstaller `
+& $pythonCommand -m PyInstaller `
   --noconfirm `
   --clean `
   --onedir `
   --windowed `
   --name ITProvisioningCenter `
+  --hidden-import diagnostics `
+  --hidden-import monitor_panel `
+  --hidden-import reinstall `
   app.py
 
 $bundle = Join-Path $projectRoot "dist\ITProvisioningCenter"

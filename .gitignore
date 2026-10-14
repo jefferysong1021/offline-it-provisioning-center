@@ -25,3 +25,7 @@ drivers/*.msix
 drivers/*.msixbundle
 drivers/*.appx
 drivers/*.cab
+*.iso
+*.img
+*.wim
+*.esd
