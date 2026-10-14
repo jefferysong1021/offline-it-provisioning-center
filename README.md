@@ -84,6 +84,24 @@ it-provisioning-center/
 
 ![软件与驱动安装界面](docs/screenshots/packages.png)
 
+### Windows 系统安装 / Windows Setup
+
+选择程序目录之外的 Windows ISO 和 INF 驱动目录后，可查看设备、镜像大小、安装模式及驱动数量等预检信息。原位重装会启动 Windows Setup，由操作者在安装向导中确认兼容性和保留选项；全新安装会生成准备计划，之后需从启动 U 盘进入 Setup 并手动选择目标分区。
+
+![Windows 系统安装与镜像预检界面](docs/screenshots/windows-setup.png)
+
+### 系统与网络实时诊断 / System & Network Diagnostics
+
+诊断页面支持按设定间隔采集 CPU、内存、系统盘和进程信息，并绘制最近样本的性能趋势。网络检测可查看默认网关、DNS 解析、指定 TCP 端口、TCP 443 连通性和 HTTPS 请求结果；采样历史可导出为 JSON。网络探测结果会受防火墙、VPN 和目标服务器策略影响，应结合业务访问情况判断。
+
+下图展示诊断页尚未开始采样时的状态：
+
+![实时诊断初始界面](docs/screenshots/system-diagnostics-idle.png)
+
+开始监测并执行网络检测后，页面展示资源使用率、网络连通状态、进程快照和趋势曲线：
+
+![系统与网络诊断采样结果](docs/screenshots/system-network-diagnostics.png)
+
 ## 打包为 U 盘便携版
 
 在 Windows 上使用与目标电脑架构一致、包含完整 Tcl/Tk 的 Python，安装 PyInstaller：
